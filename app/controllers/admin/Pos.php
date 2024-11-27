@@ -808,7 +808,7 @@ class Pos extends MY_Controller
             $biller           = $biller_details->company && $biller_details->company != '-' ? $biller_details->company : $biller_details->name;
             $note             = $this->sma->clear_tags($this->input->post('pos_note'));
             //$staff_note       = $this->sma->clear_tags($this->input->post('staff_note'));
-            $staff_note       = $this->input->post('staffnote1') ? $this->input->post('staffnote1') : 0;
+            $staff_note       = $this->sma->clear_tags($this->input->post('staff_note') ?: 'Contado');
 
 
             $total            = 0;

@@ -553,30 +553,24 @@
                         ?>
                         <div class="form-group">
                             <div class="row">
-                                <div class="col-sm-6">
-                                    <?=form_textarea('sale_note', '', 'id="sale_note" class="form-control kb-text skip" style="height: 100px;" placeholder="' . lang('sale_note') . '" maxlength="250"');?>
+                                <div class="col-sm-4">
+                                    <?=form_textarea('sale_note', '', 'id="sale_note" class="form-control kb-text skip" style="height: 40px;" placeholder="' . lang('sale_note') . '" maxlength="250"');?>
                                 </div>
-                                <div class="col-sm-6">
-                                    <?=form_textarea('staffnote', '', 'id="staffnote" class="form-control kb-text skip" style="height: 100px;" placeholder="' . lang('staff_note') . '" maxlength="250"');?>
+                                <div class="col-sm-4">
+                                    <?=form_textarea('staffnote', '', 'id="staffnote" readonly class="form-control kb-text skip" style="height: 40px;" placeholder="' . lang('staff_note') . '" maxlength="250"');?>
                                 </div>
-                                <div class="form-group">
-                                    <label for="staffnote" class="col-sm-4 control-label"><?= lang('staff_note') ?></label>
-                                    <div class="col-sm-8">
-                                        <?php
-                                        // Opciones del select
-                                        $options = [
-                                            'contado' => lang('contado'),
-                                            'credito' => lang('credito')
-                                        ];
-                                        // Renderizamos el select utilizando `form_dropdown`
-                                        echo form_dropdown(
-                                            'staffnote', // Nombre del campo (debe coincidir con lo esperado en el backend)
-                                            $options,    // Opciones disponibles
-                                            'contado',   // Valor por defecto
-                                            'id="staffnote" class="form-control kb-text skip" style="width:100%;"' // Atributos
-                                        );
-                                        ?>
-                                    </div>
+                                <div class="col-sm-4">
+                                    <!-- Select para Tipo de Pago -->
+                                    <?= form_dropdown(
+                                        'tipo_pago', // Nombre del select
+                                        [
+                                            '' => lang('Seleccionar Tipo Pago'),
+                                            'Contado' => lang('Contado'),
+                                            'Credito' => lang('Credito'),
+                                        ],
+                                        '', // Sin valor predeterminado
+                                        'id="tipo_pago" class="form-control kb-text skip" style="height: 40px;" required="required"'
+                                    ); ?>
                                 </div>
                             </div>
                         </div>
@@ -1258,6 +1252,21 @@ var lang = {
         $('#view-customer').click(function(){
             $('#myModal').modal({remote: site.base_url + 'customers/view/' + $("input[name=customer]").val()});
             $('#myModal').modal('show');
+        });
+        $('#tipo_pago').change(function () {
+            // Obtener el valor seleccionado en el select
+            var selectedValue = $(this).val();
+
+            // Asignar el valor al campo staffnote
+            $('#staffnote').val(selectedValue);
+            //$('#sale_note').val(selectedValue);
+
+            // Ejecutar la lógica para agregar un salto de línea automáticamente en todos los textarea
+            $('textarea').each(function () {
+                var currentValue = $(this).val();
+                // Agregar un salto de línea al valor actual del textarea
+                $(this).val(currentValue).focus();
+            });
         });
         $('textarea').keydown(function (e) {
             if (e.which == 13) {
