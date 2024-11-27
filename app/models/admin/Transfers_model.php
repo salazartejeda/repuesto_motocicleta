@@ -421,7 +421,7 @@ class Transfers_model extends CI_Model
         }
 
         $this->db->select('
-            transfers.id, 
+            purchase_items.id as id, 
             transfers.date, 
             transfers.id as transfer_no, 
             transfers.from_warehouse_name as fname, 
@@ -440,10 +440,10 @@ class Transfers_model extends CI_Model
         $this->db->from('purchase_items');
         $this->db->join('transfers', 'transfers.id = purchase_items.transfer_id', 'left');
         $this->db->join('products', 'products.id = purchase_items.product_id', 'left');
-        $this->db->join('warehouses_products', 'warehouses_products.product_id = products.id', 'left');
         $this->db->join('brands', 'brands.id = products.brand', 'left');
         $this->db->join('users', 'users.id = transfers.created_by', 'left');
-        $this->db->where('purchase_items.transfer_id', $id);
+        $this->db->where('purchase_items.id', $id);
+        $this->db->where('purchase_items.transfer_id IS NOT NULL');
 
         $query = $this->db->get();
 

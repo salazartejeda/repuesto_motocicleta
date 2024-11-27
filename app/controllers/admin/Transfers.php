@@ -1104,7 +1104,7 @@ class Transfers extends MY_Controller
         $this->load->library('datatables');
 
         $this->datatables
-            ->select('purchase_items.transfer_id, transfers.date, transfers.id as transfer_no, 
+            ->select('purchase_items.id as id, transfers.date, transfers.id as transfer_no, 
             transfers.from_warehouse_name as fname, transfers.from_warehouse_code as fcode, 
             transfers.to_warehouse_name as tname, transfers.to_warehouse_code as tcode, users.username, brands.name as brand,
             products.name as product, purchase_items.product_unit_code, purchase_items.quantity as cantidad, products.cost as costo, 
@@ -1112,9 +1112,9 @@ class Transfers extends MY_Controller
             ->from('purchase_items')
             ->join('transfers', 'transfers.id = purchase_items.transfer_id', 'left')
             ->join('products', 'products.id = purchase_items.product_id', 'left')
-            ->join('warehouses_products', 'warehouses_products.product_id = products.id', 'left')
             ->join('brands', 'brands.id = products.brand', 'left')
             ->join('users', 'users.id = transfers.created_by', 'left')
+            ->where('purchase_items.transfer_id IS NOT NULL')
             ->edit_column('fname', '$1 ($2)', 'fname, fcode')
             ->edit_column('tname', '$1 ($2)', 'tname, tcode');
 
