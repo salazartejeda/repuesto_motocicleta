@@ -694,3 +694,4 @@ $lang['file_delete_failed']         = 'No se puede eliminar el archivo, por favo
 $lang['id_not_found']               = 'No se proporcionó un ID para eliminar el registro.';
 $lang['too_many_products']          = 'Estás intentando importar demasiados productos.';
 $lang['payment_type']               = 'Tipo Pago';
+$lang['due_date']                   = 'Vence';

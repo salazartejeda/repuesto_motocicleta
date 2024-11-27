@@ -863,6 +863,11 @@
                                             <i class="fa fa-heart"></i><span class="text"> <?= lang('Informe de ventas por productos'); ?></span>
                                         </a>
                                     </li>
+                                    <li id="reports_sales_cartera">
+                                        <a href="<?= admin_url('reports/sales_cartera') ?>">
+                                            <i class="fa fa-heart"></i><span class="text"> <?= lang('Reporte_de_cartera'); ?></span>
+                                        </a>
+                                    </li>
                                     <li id="reports_payments">
                                         <a href="<?= admin_url('reports/payments') ?>">
                                             <i class="fa fa-money"></i><span class="text"> <?= lang('payments_report'); ?></span>
@@ -1360,6 +1365,11 @@
                                     <li id="reports_sales1">
                                         <a href="<?= admin_url('reports/sales1') ?>">
                                             <i class="fa fa-heart"></i><span class="text"> <?= lang('Informe de ventas por productos'); ?></span>
+                                        </a>
+                                    </li>
+                                    <li id="reports_sales_cartera">
+                                        <a href="<?= admin_url('reports/sales_cartera') ?>">
+                                            <i class="fa fa-heart"></i><span class="text"> <?= lang('Reporte_de_cartera'); ?></span>
                                         </a>
                                     </li>
                                     <?php
