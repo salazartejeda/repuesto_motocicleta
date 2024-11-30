@@ -1,30 +1,41 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php
-
 $v = '';
 /* if($this->input->post('name')){
-  $v .= "&product=".$this->input->post('product');
-  } */
-if ($this->input->post('product')) {
-    $v .= '&product=' . $this->input->post('product');
+  $v .= "&name=".$this->input->post('name');
+} */
+if ($this->input->post('payment_ref')) {
+    $v .= '&payment_ref=' . $this->input->post('payment_ref');
 }
-if ($this->input->post('reference_no')) {
-    $v .= '&reference_no=' . $this->input->post('reference_no');
+if ($this->input->post('paid_by')) {
+    $v .= '&paid_by=' . $this->input->post('paid_by');
 }
-if ($this->input->post('customer')) {
-    $v .= '&customer=' . $this->input->post('customer');
+if ($this->input->post('sale_ref')) {
+    $v .= '&sale_ref=' . $this->input->post('sale_ref');
+}
+if ($this->input->post('purchase_ref')) {
+    $v .= '&purchase_ref=' . $this->input->post('purchase_ref');
+}
+if ($this->input->post('supplier')) {
+    $v .= '&supplier=' . $this->input->post('supplier');
 }
 if ($this->input->post('biller')) {
     $v .= '&biller=' . $this->input->post('biller');
 }
-if ($this->input->post('warehouse')) {
-    $v .= '&warehouse=' . $this->input->post('warehouse');
+if ($this->input->post('customer')) {
+    $v .= '&customer=' . $this->input->post('customer');
 }
 if ($this->input->post('user')) {
     $v .= '&user=' . $this->input->post('user');
 }
-if ($this->input->post('serial')) {
-    $v .= '&serial=' . $this->input->post('serial');
+if ($this->input->post('cheque')) {
+    $v .= '&cheque=' . $this->input->post('cheque');
+}
+if ($this->input->post('tid')) {
+    $v .= '&tid=' . $this->input->post('tid');
+}
+if ($this->input->post('card')) {
+    $v .= '&card=' . $this->input->post('card');
 }
 if ($this->input->post('start_date')) {
     $v .= '&start_date=' . $this->input->post('start_date');
@@ -32,15 +43,19 @@ if ($this->input->post('start_date')) {
 if ($this->input->post('end_date')) {
     $v .= '&end_date=' . $this->input->post('end_date');
 }
-if ($this->input->post('due_date')) {
-    $v .= '&due_date=' . $this->input->post('due_date');
-}
-
 ?>
-
 <script>
     $(document).ready(function () {
-        oTable = $('#SlRData').dataTable({
+        var pb = <?= json_encode($pb); ?>;
+        function paid_by(x) {
+            return (x != null) ? (pb[x] ? pb[x] : x) : x;
+        }
+
+        function ref(x) {
+            return (x != null) ? x : ' ';
+        }
+
+        oTable = $('#PayRData').dataTable({
             "aaSorting": [[0, "desc"]],
             "aLengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "<?= lang('all') ?>"]],
             "iDisplayLength": <?= $Settings->rows_per_page ?>,
@@ -53,52 +68,112 @@ if ($this->input->post('due_date')) {
                 });
                 $.ajax({'dataType': 'json', 'type': 'POST', 'url': sSource, 'data': aoData, 'success': fnCallback});
             },
+            "aoColumns": [{"mRender": fld}, {"mRender": fld}, null, {"mRender": ref}, {"mRender": ref}, 
+            {"mRender": ref}, {"mRender": paid_by}, {"mRender": currencyFormat}, {"mRender": currencyFormat},
+            {"mRender": currencyFormat}, {"mRender": currencyFormat}, {"mRender": fld}, 
+            {"mRender": currencyFormat}, {"bVisible": false}],
             'fnRowCallback': function (nRow, aData, iDisplayIndex) {
-                nRow.id = aData[10];
-                nRow.className = (aData[5] > 0) ? "invoice_link2" : "invoice_link2 warning";
+                nRow.id = aData[13];
+                nRow.className = "payment_link";
+                if (aData[9] == 'sent') {
+                    nRow.className = "payment_link2 warning";
+                } else if (aData[10] == 'returned') {
+                    nRow.className = "payment_link danger";
+                }
                 return nRow;
             },
-            "aoColumns": [{"mRender": fld}, null, null, null, {
-                "bSearchable": false,
-                "mRender": pqFormat
-            }, {"mRender": currencyFormat}, {"mRender": currencyFormat}, {"mRender": currencyFormat}, {"mRender": row_status}, {"mRender": fld}],
             "fnFooterCallback": function (nRow, aaData, iStart, iEnd, aiDisplay) {
-                var gtotal = 0, paid = 0, balance = 0;
+                var total = 0, dia_credito = 0, monto_factura = 0, saldo = 0;
                 for (var i = 0; i < aaData.length; i++) {
-                    gtotal += parseFloat(aaData[aiDisplay[i]][5]);
-                    paid += parseFloat(aaData[aiDisplay[i]][6]);
-                    balance += parseFloat(aaData[aiDisplay[i]][7]);
+                    // if (aaData[aiDisplay[i]][6] == 'sent' || aaData[aiDisplay[i]][6] == 'returned')
+                    if (aaData[aiDisplay[i]][10] == 'sent'){
+                        dia_credito   -= parseFloat(aaData[aiDisplay[i]][7]);
+                        monto_factura -= parseFloat(aaData[aiDisplay[i]][8]);
+                        total         -= parseFloat(aaData[aiDisplay[i]][9]);
+                        saldo         -= parseFloat(aaData[aiDisplay[i]][10]);
+                    }else{
+                        dia_credito   += parseFloat(aaData[aiDisplay[i]][7]);
+                        monto_factura += parseFloat(aaData[aiDisplay[i]][8]);
+                        total         += parseFloat(aaData[aiDisplay[i]][9]);
+                        saldo         += parseFloat(aaData[aiDisplay[i]][10]);
+                    }
                 }
                 var nCells = nRow.getElementsByTagName('th');
-                nCells[5].innerHTML = currencyFormat(parseFloat(gtotal));
-                nCells[6].innerHTML = currencyFormat(parseFloat(paid));
-                nCells[7].innerHTML = currencyFormat(parseFloat(balance));
+                nCells[7].innerHTML = currencyFormat(parseFloat(dia_credito));
+                nCells[8].innerHTML = currencyFormat(parseFloat(monto_factura));
+                nCells[9].innerHTML = currencyFormat(parseFloat(total));
+                nCells[10].innerHTML = currencyFormat(parseFloat(saldo));
             }
         }).fnSetFilteringDelay().dtFilter([
             {column_number: 0, filter_default_label: "[<?=lang('date');?> (yyyy-mm-dd)]", filter_type: "text", data: []},
-            {column_number: 1, filter_default_label: "[<?=lang('reference_no');?>]", filter_type: "text", data: []},
-            {column_number: 2, filter_default_label: "[<?=lang('biller');?>]", filter_type: "text", data: []},
-            {column_number: 3, filter_default_label: "[<?=lang('customer');?>]", filter_type: "text", data: []},
-            {column_number: 8, filter_default_label: "[<?=lang('payment_status');?>]", filter_type: "text", data: []},
-            {column_number: 9, filter_default_label: "[<?=lang('due_date');?> (yyyy-mm-dd)]", filter_type: "text", data: []},
+            {column_number: 1, filter_default_label: "[<?=lang('date');?> (yyyy-mm-dd)]", filter_type: "text", data: []},
+            {column_number: 2, filter_default_label: "[<?=lang('No_Pago');?>]", filter_type: "text", data: []},
+            {column_number: 3, filter_default_label: "[<?=lang('Factura');?>]", filter_type: "text", data: []},
+            {column_number: 4, filter_default_label: "[<?=lang('customer');?>]", filter_type: "text", data: []},
+            {column_number: 5, filter_default_label: "[<?=lang('created_by');?>]", filter_type: "text", data: []},
+            {column_number: 6, filter_default_label: "[<?=lang('condiciones_pago');?>]", filter_type: "text", data: []},
+            {column_number: 11, filter_default_label: "[<?=lang('date');?> (yyyy-mm-dd)]", filter_type: "text", data: []},
         ], "footer");
+
     });
 </script>
 <script type="text/javascript">
     $(document).ready(function () {
         $('#form').hide();
-        <?php if ($this->input->post('customer')) {
+        <?php if ($this->input->post('biller')) {
     ?>
-        $('#customer').val(<?= $this->input->post('customer') ?>).select2({
+        $('#rbiller').select2({ allowClear: true });
+        <?php
+} ?>
+        <?php if ($this->input->post('supplier')) {
+        ?>
+        $('#rsupplier').val(<?= $this->input->post('supplier') ?>).select2({
             minimumInputLength: 1,
-            data: [],
+            allowClear: true,
             initSelection: function (element, callback) {
                 $.ajax({
                     type: "get", async: false,
-                    url: site.base_url + "customers/suggestions/" + $(element).val(),
+                    url: "<?= admin_url('suppliers/getSupplier') ?>/" + $(element).val(),
                     dataType: "json",
                     success: function (data) {
-                        callback(data.results[0]);
+                        callback(data[0]);
+                    }
+                });
+            },
+            ajax: {
+                url: site.base_url + "suppliers/suggestions",
+                dataType: 'json',
+                quietMillis: 15,
+                data: function (term, page) {
+                    return {
+                        term: term,
+                        limit: 10
+                    };
+                },
+                results: function (data, page) {
+                    if (data.results != null) {
+                        return {results: data.results};
+                    } else {
+                        return {results: [{id: '', text: 'No Match Found'}]};
+                    }
+                }
+            }
+        });
+        $('#rsupplier').val(<?= $this->input->post('supplier') ?>);
+        <?php
+    } ?>
+        <?php if ($this->input->post('customer')) {
+        ?>
+        $('#rcustomer').val(<?= $this->input->post('customer') ?>).select2({
+            minimumInputLength: 1,
+            allowClear: true,
+            initSelection: function (element, callback) {
+                $.ajax({
+                    type: "get", async: false,
+                    url: "<?= admin_url('customers/getCustomer') ?>/" + $(element).val(),
+                    dataType: "json",
+                    success: function (data) {
+                        callback(data[0]);
                     }
                 });
             },
@@ -121,10 +196,8 @@ if ($this->input->post('due_date')) {
                 }
             }
         });
-
-        $('#customer').val(<?= $this->input->post('customer') ?>);
         <?php
-} ?>
+    } ?>
         $('.toggle_down').click(function () {
             $("#form").slideDown();
             return false;
@@ -136,17 +209,12 @@ if ($this->input->post('due_date')) {
     });
 </script>
 
-
 <div class="box">
     <div class="box-header">
-        <h2 class="blue"><i class="fa-fw fa fa-heart"></i><?= lang('Reporte_de_cartera'); ?> <?php
+        <h2 class="blue"><i class="fa-fw fa fa-money"></i><?= lang('Reporte Cartera'); ?> <?php
             if ($this->input->post('start_date')) {
                 echo 'From ' . $this->input->post('start_date') . ' to ' . $this->input->post('end_date');
-            }
-            if ($this->input->post('due_date')) {
-                echo 'vencimiento ' . $this->input->post('due_date');
-            }
-            ?>
+            } ?>
         </h2>
 
         <div class="box-icon">
@@ -190,16 +258,80 @@ if ($this->input->post('due_date')) {
                     <div class="row">
                         <div class="col-sm-4">
                             <div class="form-group">
-                                <?= lang('product', 'suggest_product'); ?>
-                                <?php echo form_input('sproduct', (isset($_POST['sproduct']) ? $_POST['sproduct'] : ''), 'class="form-control" id="suggest_product"'); ?>
-                                <input type="hidden" name="product" value="<?= isset($_POST['product']) ? $_POST['product'] : '' ?>" id="report_product_id"/>
+                                <?= lang('payment_ref', 'payment_ref'); ?>
+                                <?php echo form_input('payment_ref', ($_POST['payment_ref'] ?? ''), 'class="form-control tip" id="payment_ref"'); ?>
+
+                            </div>
+                        </div>
+
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                            <?=lang('paid_by', 'paid_by');?>
+                                <select name="paid_by" id="paid_by" class="form-control paid_by">
+                                    <?= $this->sma->paid_opts($this->input->post('paid_by'), false, true); ?>
+                                    <?=$pos_settings && $pos_settings->paypal_pro ? '<option value="ppp">' . lang('paypal_pro') . '</option>' : '';?>
+                                    <?=$pos_settings && $pos_settings->stripe ? '<option value="stripe">' . lang('stripe') . '</option>' : '';?>
+                                    <?=$pos_settings && $pos_settings->authorize ? '<option value="authorize">' . lang('authorize') . '</option>' : '';?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('sale_ref', 'sale_ref'); ?>
+                                <?php echo form_input('sale_ref', ($_POST['sale_ref'] ?? ''), 'class="form-control tip" id="sale_ref"'); ?>
+
+                            </div>
+                        </div>
+
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('purchase_ref', 'purchase_ref'); ?>
+                                <?php echo form_input('purchase_ref', ($_POST['purchase_ref'] ?? ''), 'class="form-control tip" id="purchase_ref"'); ?>
+
+                            </div>
+                        </div>
+
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label class="control-label" for="rcustomer"><?= lang('customer'); ?></label>
+                                <?php echo form_input('customer', ($_POST['customer'] ?? ''), 'class="form-control" id="rcustomer" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('customer') . '"'); ?>
                             </div>
                         </div>
                         <div class="col-sm-4">
                             <div class="form-group">
-                                <label class="control-label" for="reference_no"><?= lang('reference_no'); ?></label>
-                                <?php echo form_input('reference_no', (isset($_POST['reference_no']) ? $_POST['reference_no'] : ''), 'class="form-control tip" id="reference_no"'); ?>
+                                <label class="control-label" for="rbiller"><?= lang('biller'); ?></label>
+                                <?php
+                                $bl[''] = '';
+                                foreach ($billers as $biller) {
+                                    $bl[$biller->id] = $biller->company && $biller->company != '-' ? $biller->company : $biller->name;
+                                }
+                                echo form_dropdown('biller', $bl, ($_POST['biller'] ?? ''), 'class="form-control" id="rbiller" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('biller') . '"');
+                                ?>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('supplier', 'rsupplier'); ?>
+                                <?php echo form_input('supplier', ($_POST['supplier'] ?? ''), 'class="form-control" id="rsupplier" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('supplier') . '"'); ?> </div>
+                        </div>
 
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('transaction_id', 'tid'); ?>
+                                <?php echo form_input('tid', ($_POST['tid'] ?? ''), 'class="form-control" id="tid"'); ?>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('card_no', 'card'); ?>
+                                <?php echo form_input('card', ($_POST['card'] ?? ''), 'class="form-control" id="card"'); ?>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <?= lang('cheque_no', 'cheque'); ?>
+                                <?php echo form_input('cheque', ($_POST['cheque'] ?? ''), 'class="form-control" id="cheque"'); ?>
                             </div>
                         </div>
 
@@ -211,66 +343,20 @@ if ($this->input->post('due_date')) {
                                 foreach ($users as $user) {
                                     $us[$user->id] = $user->first_name . ' ' . $user->last_name;
                                 }
-                                echo form_dropdown('user', $us, (isset($_POST['user']) ? $_POST['user'] : ''), 'class="form-control" id="user" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('user') . '"');
+                                echo form_dropdown('user', $us, ($_POST['user'] ?? ''), 'class="form-control" id="user" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('user') . '"');
                                 ?>
                             </div>
                         </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label class="control-label" for="customer"><?= lang('customer'); ?></label>
-                                <?php echo form_input('customer', (isset($_POST['customer']) ? $_POST['customer'] : ''), 'class="form-control" id="customer" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('customer') . '"'); ?>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label class="control-label" for="biller"><?= lang('biller'); ?></label>
-                                <?php
-                                $bl[''] = lang('select') . ' ' . lang('biller');
-                                foreach ($billers as $biller) {
-                                    $bl[$biller->id] = $biller->company && $biller->company != '-' ? $biller->company : $biller->name;
-                                }
-                                echo form_dropdown('biller', $bl, (isset($_POST['biller']) ? $_POST['biller'] : ''), 'class="form-control" id="biller" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('biller') . '"');
-                                ?>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label class="control-label" for="warehouse"><?= lang('warehouse'); ?></label>
-                                <?php
-                                $wh[''] = lang('select') . ' ' . lang('warehouse');
-                                foreach ($warehouses as $warehouse) {
-                                    $wh[$warehouse->id] = $warehouse->name;
-                                }
-                                echo form_dropdown('warehouse', $wh, (isset($_POST['warehouse']) ? $_POST['warehouse'] : ''), 'class="form-control" id="warehouse" data-placeholder="' . $this->lang->line('select') . ' ' . $this->lang->line('warehouse') . '"');
-                                ?>
-                            </div>
-                        </div>
-                        <?php if ($Settings->product_serial) {
-                                    ?>
-                            <div class="col-sm-4">
-                                <div class="form-group">
-                                    <?= lang('serial_no', 'serial'); ?>
-                                    <?= form_input('serial', '', 'class="form-control tip" id="serial"'); ?>
-                                </div>
-                            </div>
-                        <?php
-                                } ?>
                         <div class="col-sm-4">
                             <div class="form-group">
                                 <?= lang('start_date', 'start_date'); ?>
-                                <?php echo form_input('start_date', (isset($_POST['start_date']) ? $_POST['start_date'] : ''), 'class="form-control datetime" id="start_date"'); ?>
+                                <?php echo form_input('start_date', ($_POST['start_date'] ?? ''), 'class="form-control datetime" id="start_date"'); ?>
                             </div>
                         </div>
                         <div class="col-sm-4">
                             <div class="form-group">
                                 <?= lang('end_date', 'end_date'); ?>
-                                <?php echo form_input('end_date', (isset($_POST['end_date']) ? $_POST['end_date'] : ''), 'class="form-control datetime" id="end_date"'); ?>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <?= lang('due_date', 'due_date'); ?>
-                                <?php echo form_input('due_date', (isset($_POST['due_date']) ? $_POST['due_date'] : ''), 'class="form-control datetime" id="due_date"'); ?>
+                                <?php echo form_input('end_date', ($_POST['end_date'] ?? ''), 'class="form-control datetime" id="end_date"'); ?>
                             </div>
                         </div>
                     </div>
@@ -283,44 +369,42 @@ if ($this->input->post('due_date')) {
                 </div>
                 <div class="clearfix"></div>
 
+
                 <div class="table-responsive">
-                    <table id="SlRData"
+                    <table id="PayRData"
                            class="table table-bordered table-hover table-striped table-condensed reports-table">
+
                         <thead>
                         <tr>
-                            <th><?= lang('date'); ?></th>
-                            <th><?= lang('reference_no'); ?></th>
-                            <th><?= lang('biller'); ?></th>
+                            <th><?= lang('Fecha_Pago'); ?></th>
+                            <th><?= lang('Fecha_Factura'); ?></th>
+                            <th><?= lang('No Pago'); ?></th>
+                            <th><?= lang('Factura'); ?></th>
                             <th><?= lang('customer'); ?></th>
-                            <th><?= lang('product_qty'); ?></th>
-                            <th><?= lang('grand_total'); ?></th>
-                            <th><?= lang('paid'); ?></th>
-                            <th><?= lang('balance'); ?></th>
-                            <th><?= lang('payment_status'); ?></th>
-                            <th><?= lang('due_date'); ?></th>
+                            <th><?= lang('created_by'); ?></th>
+                            <th><?= lang('Condiciones_Pago'); ?></th>
+                            <th><?= lang('Dias_Credito'); ?></th>
+                            <th><?= lang('Monto_Factura'); ?></th>
+                            <th><?= lang('Abonos'); ?></th>
+                            <th><?= lang('Saldo'); ?></th>
+                            <th><?= lang('Hoy'); ?></th>
+                            <th><?= lang('Atraso'); ?></th>
+                            <th><?= lang('id'); ?></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr>
-                            <td colspan="9" class="dataTables_empty"><?= lang('loading_data_from_server') ?></td>
+                            <td colspan="13" class="dataTables_empty"><?= lang('loading_data_from_server') ?></td>
                         </tr>
                         </tbody>
                         <tfoot class="dtFilter">
                         <tr class="active">
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                            <th><?= lang('product_qty'); ?></th>
-                            <th><?= lang('grand_total'); ?></th>
-                            <th><?= lang('paid'); ?></th>
-                            <th><?= lang('balance'); ?></th>
-                            <th></th>
-                            <th></th>
+                            <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
                         </tr>
                         </tfoot>
                     </table>
                 </div>
+
             </div>
         </div>
     </div>
@@ -330,12 +414,12 @@ if ($this->input->post('due_date')) {
     $(document).ready(function () {
         $('#pdf').click(function (event) {
             event.preventDefault();
-            window.location.href = "<?=admin_url('reports/getSalesReport/pdf/?v=1' . $v)?>";
+            window.location.href = "<?=admin_url('reports/getSalesCartera/pdf/?v=1' . $v)?>";
             return false;
         });
         $('#xls').click(function (event) {
             event.preventDefault();
-            window.location.href = "<?=admin_url('reports/getSalesReport/0/xls/?v=1' . $v)?>";
+            window.location.href = "<?=admin_url('reports/getSalesCartera/0/xls/?v=1' . $v)?>";
             return false;
         });
         $('#image').click(function (event) {

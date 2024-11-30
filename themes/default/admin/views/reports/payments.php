@@ -94,8 +94,8 @@ if ($this->input->post('end_date')) {
         }).fnSetFilteringDelay().dtFilter([
             {column_number: 0, filter_default_label: "[<?=lang('date');?> (yyyy-mm-dd)]", filter_type: "text", data: []},
             {column_number: 1, filter_default_label: "[<?=lang('payment_ref');?>]", filter_type: "text", data: []},
-            {column_number: 2, filter_default_label: "[<?=lang('sale_ref');?>]", filter_type: "text", data: []},
-            {column_number: 3, filter_default_label: "[<?=lang('purchase_ref');?>]", filter_type: "text", data: []},
+            {column_number: 2, filter_default_label: "[<?=lang('created_by');?>]", filter_type: "text", data: []},
+            {column_number: 3, filter_default_label: "[<?=lang('customer');?>]", filter_type: "text", data: []},
             {column_number: 4, filter_default_label: "[<?=lang('paid_by');?>]", filter_type: "text", data: []},
             {column_number: 6, filter_default_label: "[<?=lang('type');?>]", filter_type: "text", data: []},
         ], "footer");
@@ -363,8 +363,8 @@ if ($this->input->post('end_date')) {
                         <tr>
                             <th><?= lang('date'); ?></th>
                             <th><?= lang('payment_ref'); ?></th>
-                            <th><?= lang('sale_ref'); ?></th>
-                            <th><?= lang('purchase_ref'); ?></th>
+                            <th><?= lang('created_by'); ?></th>
+                            <th><?= lang('customer'); ?></th>
                             <th><?= lang('paid_by'); ?></th>
                             <th><?= lang('amount'); ?></th>
                             <th><?= lang('type'); ?></th>

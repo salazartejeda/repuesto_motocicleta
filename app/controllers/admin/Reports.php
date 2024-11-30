@@ -1306,10 +1306,12 @@ class Reports extends MY_Controller
         }
         if ($pdf || $xls) {
             $this->db
-                ->select('' . $this->db->dbprefix('payments') . '.date, ' . $this->db->dbprefix('payments') . '.reference_no as payment_ref, ' . $this->db->dbprefix('sales') . '.reference_no as sale_ref, ' . $this->db->dbprefix('purchases') . '.reference_no as purchase_ref, paid_by, amount, type')
+                ->select('' . $this->db->dbprefix('payments') . '.date, ' . $this->db->dbprefix('payments') . '.reference_no as payment_ref, ' . $this->db->dbprefix('users') . '.username as sale_ref, ' . $this->db->dbprefix('sales') . '.customer as purchase_ref, paid_by, amount, type')
                 ->from('payments')
                 ->join('sales', 'payments.sale_id=sales.id', 'left')
+                ->join('users', 'payments.created_by=users.id', 'left')
                 ->join('purchases', 'payments.purchase_id=purchases.id', 'left')
+                ->where('amount >', 0) // Solo incluye registros con amount > 0
                 ->group_by('payments.id')
                 ->order_by('payments.date desc');
 
@@ -1368,8 +1370,8 @@ class Reports extends MY_Controller
                 $this->excel->getActiveSheet()->setTitle(lang('payments_report'));
                 $this->excel->getActiveSheet()->SetCellValue('A1', lang('date'));
                 $this->excel->getActiveSheet()->SetCellValue('B1', lang('payment_reference'));
-                $this->excel->getActiveSheet()->SetCellValue('C1', lang('sale_reference'));
-                $this->excel->getActiveSheet()->SetCellValue('D1', lang('purchase_reference'));
+                $this->excel->getActiveSheet()->SetCellValue('C1', lang('created_by'));
+                $this->excel->getActiveSheet()->SetCellValue('D1', lang('customer'));
                 $this->excel->getActiveSheet()->SetCellValue('E1', lang('paid_by'));
                 $this->excel->getActiveSheet()->SetCellValue('F1', lang('amount'));
                 $this->excel->getActiveSheet()->SetCellValue('G1', lang('type'));
@@ -1412,10 +1414,12 @@ class Reports extends MY_Controller
         } else {
             $this->load->library('datatables');
             $this->datatables
-                ->select("DATE_FORMAT({$this->db->dbprefix('payments')}.date, '%Y-%m-%d %T') as date, " . $this->db->dbprefix('payments') . '.reference_no as payment_ref, ' . $this->db->dbprefix('sales') . '.reference_no as sale_ref, ' . $this->db->dbprefix('purchases') . ".reference_no as purchase_ref, paid_by, amount, type, {$this->db->dbprefix('payments')}.id as id")
+                ->select("DATE_FORMAT({$this->db->dbprefix('payments')}.date, '%Y-%m-%d %T') as date, " . $this->db->dbprefix('payments') . '.reference_no as payment_ref, ' . $this->db->dbprefix('users') . '.username as sale_ref, ' . $this->db->dbprefix('sales') . ".customer as purchase_ref, paid_by, amount, type, {$this->db->dbprefix('payments')}.id as id")
                 ->from('payments')
                 ->join('sales', 'payments.sale_id=sales.id', 'left')
+                ->join('users', 'payments.created_by=users.id', 'left')
                 ->join('purchases', 'payments.purchase_id=purchases.id', 'left')
+                ->where('amount >', 0) // Solo incluye registros con amount > 0
                 ->group_by('payments.id');
 
             if ($user) {
@@ -3666,46 +3670,74 @@ class Reports extends MY_Controller
 
     public function getSalesCartera($pdf = null, $xls = null)
     {
-        $this->sma->checkPermissions('sales', true);
-        $product      = $this->input->get('product') ? $this->input->get('product') : null;
-        $user         = $this->input->get('user') ? $this->input->get('user') : null;
-        $customer     = $this->input->get('customer') ? $this->input->get('customer') : null;
-        $biller       = $this->input->get('biller') ? $this->input->get('biller') : null;
-        $warehouse    = $this->input->get('warehouse') ? $this->input->get('warehouse') : null;
-        $reference_no = $this->input->get('reference_no') ? $this->input->get('reference_no') : null;
-        $start_date   = $this->input->get('start_date') ? $this->input->get('start_date') : null;
-        $end_date     = $this->input->get('end_date') ? $this->input->get('end_date') : null;
-        $due_date     = $this->input->get('due_date') ? $this->input->get('due_date') : null;
-        $serial       = $this->input->get('serial') ? $this->input->get('serial') : null;
+        $this->sma->checkPermissions('payments', true);
+
+        $user           = $this->input->get('user') ? $this->input->get('user') : null;
+        $supplier       = $this->input->get('supplier') ? $this->input->get('supplier') : null;
+        $customer       = $this->input->get('customer') ? $this->input->get('customer') : null;
+        $biller         = $this->input->get('biller') ? $this->input->get('biller') : null;
+        $payment_ref    = $this->input->get('payment_ref') ? $this->input->get('payment_ref') : null;
+        $paid_by        = $this->input->get('paid_by') ? $this->input->get('paid_by') : null;
+        $sale_ref       = $this->input->get('sale_ref') ? $this->input->get('sale_ref') : null;
+        $purchase_ref   = $this->input->get('purchase_ref') ? $this->input->get('purchase_ref') : null;
+        $card           = $this->input->get('card') ? $this->input->get('card') : null;
+        $cheque         = $this->input->get('cheque') ? $this->input->get('cheque') : null;
+        $transaction_id = $this->input->get('tid') ? $this->input->get('tid') : null;
+        $start_date     = $this->input->get('start_date') ? $this->input->get('start_date') : null;
+        $end_date       = $this->input->get('end_date') ? $this->input->get('end_date') : null;
 
         if ($start_date) {
             $start_date = $this->sma->fld($start_date);
             $end_date   = $this->sma->fld($end_date);
         }
-        if ($due_date) {
-            $due_date = $this->sma->fld($due_date);
-        }
         if (!$this->Owner && !$this->Admin && !$this->session->userdata('view_right')) {
             $user = $this->session->userdata('user_id');
         }
-
         if ($pdf || $xls) {
-            $this->db
-                ->select('date, sales.id as reference_no, biller, customer, GROUP_CONCAT(CONCAT(' . $this->db->dbprefix('sale_items') . ".product_name, ' (', " . $this->db->dbprefix('sale_items') . ".quantity, ')') SEPARATOR '\n') as iname, grand_total, paid, payment_status, due_date", false)
-                ->from('sales')
-                ->join('sale_items', 'sale_items.sale_id=sales.id', 'left')
-                ->join('warehouses', 'warehouses.id=sales.warehouse_id', 'left')
-                ->group_by('sales.id')
-                ->order_by('sales.date desc');
-
+            $this->db->select("
+                DATE_FORMAT({$this->db->dbprefix('payments')}.date, '%Y-%m-%d %T') as date,
+                DATE_FORMAT({$this->db->dbprefix('sales')}.date, '%Y-%m-%d %T') as date_sale,
+                {$this->db->dbprefix('payments')}.id as payment_ref, 
+                {$this->db->dbprefix('sales')}.id as sale_ref, 
+                {$this->db->dbprefix('companies')}.name as customer, 
+                {$this->db->dbprefix('users')}.username as created_by,
+                CASE 
+                    WHEN {$this->db->dbprefix('sales')}.payment_term > 0 THEN 'Crédito' 
+                    ELSE 'Contado' 
+                END AS payment_type, 
+                sma_sales.payment_term as dias_credito,
+                sma_sales.total as total_factura,
+                amount as abono, 
+                (sma_sales.total - sma_sales.paid) as saldo, 
+                DATE_FORMAT(CURDATE(), '%Y-%m-%d %T') as dia_hoy,
+                CASE 
+                    WHEN sma_sales.due_date IS NOT NULL THEN DATEDIFF(CURDATE(), sma_sales.due_date) 
+                    ELSE 0 
+                END AS atraso
+            ")
+            ->from('payments')
+            ->join('sales', 'payments.sale_id=sales.id', 'left')
+            ->join('users', 'payments.created_by=users.id', 'left')
+            ->join('companies', 'companies.id=sales.customer_id', 'left')
+            ->group_by('payments.id')
+            ->order_by('payments.date desc');
             if ($user) {
-                $this->db->where('sales.created_by', $user);
+                $this->db->where('payments.created_by', $user);
             }
-            if ($product) {
-                $this->db->where('sale_items.product_id', $product);
+            if ($card) {
+                $this->db->like('payments.cc_no', $card, 'both');
             }
-            if ($serial) {
-                $this->db->like('sale_items.serial_no', $serial);
+            if ($cheque) {
+                $this->db->where('payments.cheque_no', $cheque);
+            }
+            if ($transaction_id) {
+                $this->db->where('payments.transaction_id', $transaction_id);
+            }
+            if ($customer) {
+                $this->db->where('sales.customer_id', $customer);
+            }
+            if ($supplier) {
+                $this->db->where('purchases.supplier_id', $supplier);
             }
             if ($biller) {
                 $this->db->where('sales.biller_id', $biller);
@@ -3713,17 +3745,28 @@ class Reports extends MY_Controller
             if ($customer) {
                 $this->db->where('sales.customer_id', $customer);
             }
-            if ($warehouse) {
-                $this->db->where('sales.warehouse_id', $warehouse);
+            if ($payment_ref) {
+                $this->db->like('payments.reference_no', $payment_ref, 'both');
             }
-            if ($reference_no) {
-                $this->db->like('sales.reference_no', $reference_no, 'both');
+            if ($paid_by) {
+                $this->db->where('payments.paid_by', $paid_by);
+            }
+            if ($sale_ref) {
+                $this->db->like('sales.reference_no', $sale_ref, 'both');
+            }
+            if ($purchase_ref) {
+                $this->db->like('purchases.reference_no', $purchase_ref, 'both');
             }
             if ($start_date) {
-                $this->db->where($this->db->dbprefix('sales') . '.date BETWEEN "' . $start_date . '" and "' . $end_date . '"');
-            }
-            if ($due_date) {
-                $this->db->where($this->db->dbprefix('sales') . '.due_date = "' . $due_date . '"');
+                $this->db->where($this->db->dbprefix('payments') . '.date BETWEEN "' . $start_date . '" and "' . $end_date . '"');
+            }else{
+                // Calculamos las fechas
+                $fecha_actual = new DateTime(); // Fecha actual
+                $fecha_inicio = $fecha_actual->modify('-7 days')->format('Y-m-d') . ' 00:00:00'; // 30 días atrás, a las 00:00
+                $fecha_fin = (new DateTime())->format('Y-m-d') . ' 23:59:59'; // Hoy, a las 23:59
+
+                // Aplicamos la condición
+                $this->db->where($this->db->dbprefix('sales') . '.date BETWEEN "' . $fecha_inicio . '" AND "' . $fecha_fin . '"');
             }
 
             $q = $this->db->get();
@@ -3738,93 +3781,106 @@ class Reports extends MY_Controller
             if (!empty($data)) {
                 $this->load->library('excel');
                 $this->excel->setActiveSheetIndex(0);
-                $this->excel->getActiveSheet()->setTitle(lang('sales_report'));
-                $this->excel->getActiveSheet()->SetCellValue('A1', lang('date'));
-                $this->excel->getActiveSheet()->SetCellValue('B1', lang('reference_no'));
-                $this->excel->getActiveSheet()->SetCellValue('C1', lang('biller'));
-                $this->excel->getActiveSheet()->SetCellValue('D1', lang('customer'));
-                $this->excel->getActiveSheet()->SetCellValue('E1', lang('product_qty'));
-                $this->excel->getActiveSheet()->SetCellValue('F1', lang('grand_total'));
-                $this->excel->getActiveSheet()->SetCellValue('G1', lang('paid'));
-                $this->excel->getActiveSheet()->SetCellValue('H1', lang('balance'));
-                $this->excel->getActiveSheet()->SetCellValue('I1', lang('payment_status'));
-                $this->excel->getActiveSheet()->SetCellValue('J1', lang('due_date'));
-
-                $row     = 2;
-                $total   = 0;
-                $paid    = 0;
-                $balance = 0;
+                $this->excel->getActiveSheet()->setTitle(lang('payments_report'));
+                $this->excel->getActiveSheet()->SetCellValue('A1', lang('Fecha Pago'));
+                $this->excel->getActiveSheet()->SetCellValue('B1', lang('Fecha Factura'));
+                $this->excel->getActiveSheet()->SetCellValue('C1', lang('No Pago'));
+                $this->excel->getActiveSheet()->SetCellValue('D1', lang('Factura'));
+                $this->excel->getActiveSheet()->SetCellValue('E1', lang('Cliente'));
+                $this->excel->getActiveSheet()->SetCellValue('F1', lang('Creado por'));
+                $this->excel->getActiveSheet()->SetCellValue('G1', lang('Condiciones Pago'));
+                $this->excel->getActiveSheet()->SetCellValue('H1', lang('Días Crédito'));
+                $this->excel->getActiveSheet()->SetCellValue('I1', lang('Monto Factura'));
+                $this->excel->getActiveSheet()->SetCellValue('J1', lang('Abonos'));
+                $this->excel->getActiveSheet()->SetCellValue('K1', lang('Saldo'));
+                $this->excel->getActiveSheet()->SetCellValue('L1', lang('Hoy'));
+                $this->excel->getActiveSheet()->SetCellValue('M1', lang('Atraso'));
+            
+                $row = 2;
                 foreach ($data as $data_row) {
-                    $this->excel->getActiveSheet()->SetCellValue('A' . $row, $this->sma->hrld($data_row->date));
-                    $this->excel->getActiveSheet()->SetCellValue('B' . $row, $data_row->reference_no);
-                    $this->excel->getActiveSheet()->SetCellValue('C' . $row, $data_row->biller);
-                    $this->excel->getActiveSheet()->SetCellValue('D' . $row, $data_row->customer);
-                    $this->excel->getActiveSheet()->SetCellValue('E' . $row, $data_row->iname);
-                    $this->excel->getActiveSheet()->SetCellValue('F' . $row, $data_row->grand_total);
-                    $this->excel->getActiveSheet()->SetCellValue('G' . $row, $data_row->paid);
-                    $this->excel->getActiveSheet()->SetCellValue('H' . $row, ($data_row->grand_total - $data_row->paid));
-                    $this->excel->getActiveSheet()->SetCellValue('I' . $row, lang($data_row->payment_status));
-                    $this->excel->getActiveSheet()->SetCellValue('J' . $row, $this->sma->hrld($data_row->due_date));
-                    $total   += $data_row->grand_total;
-                    $paid    += $data_row->paid;
-                    $balance += ($data_row->grand_total - $data_row->paid);
+                    $this->excel->getActiveSheet()->SetCellValue('A' . $row, $data_row->date);
+                    $this->excel->getActiveSheet()->SetCellValue('B' . $row, $data_row->date_sale);
+                    $this->excel->getActiveSheet()->SetCellValue('C' . $row, $data_row->payment_ref);
+                    $this->excel->getActiveSheet()->SetCellValue('D' . $row, $data_row->sale_ref);
+                    $this->excel->getActiveSheet()->SetCellValue('E' . $row, $data_row->customer);
+                    $this->excel->getActiveSheet()->SetCellValue('F' . $row, $data_row->created_by);
+                    $this->excel->getActiveSheet()->SetCellValue('G' . $row, $data_row->payment_type);
+                    $this->excel->getActiveSheet()->SetCellValue('H' . $row, $data_row->dias_credito);
+                    $this->excel->getActiveSheet()->SetCellValue('I' . $row, $data_row->total_factura);
+                    $this->excel->getActiveSheet()->SetCellValue('J' . $row, $data_row->abono);
+                    $this->excel->getActiveSheet()->SetCellValue('K' . $row, $data_row->saldo);
+                    $this->excel->getActiveSheet()->SetCellValue('L' . $row, $data_row->dia_hoy);
+                    $this->excel->getActiveSheet()->SetCellValue('M' . $row, $data_row->atraso);
                     $row++;
                 }
-                $this->excel->getActiveSheet()->getStyle('F' . $row . ':H' . $row)->getBorders()
-                    ->getTop()->setBorderStyle('medium');
-                $this->excel->getActiveSheet()->SetCellValue('F' . $row, $total);
-                $this->excel->getActiveSheet()->SetCellValue('G' . $row, $paid);
-                $this->excel->getActiveSheet()->SetCellValue('H' . $row, $balance);
-
+            
                 $this->excel->getActiveSheet()->getColumnDimension('A')->setWidth(20);
                 $this->excel->getActiveSheet()->getColumnDimension('B')->setWidth(20);
-                $this->excel->getActiveSheet()->getColumnDimension('C')->setWidth(20);
-                $this->excel->getActiveSheet()->getColumnDimension('D')->setWidth(20);
-                $this->excel->getActiveSheet()->getColumnDimension('E')->setWidth(30);
-                $this->excel->getActiveSheet()->getColumnDimension('F')->setWidth(15);
-                $this->excel->getActiveSheet()->getColumnDimension('G')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('C')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('D')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('E')->setWidth(25);
+                $this->excel->getActiveSheet()->getColumnDimension('F')->setWidth(20);
+                $this->excel->getActiveSheet()->getColumnDimension('G')->setWidth(20);
                 $this->excel->getActiveSheet()->getColumnDimension('H')->setWidth(15);
-                $this->excel->getActiveSheet()->getColumnDimension('I')->setWidth(20);
-                $this->excel->getActiveSheet()->getColumnDimension('J')->setWidth(20);
-                $this->excel->getDefaultStyle()->getAlignment()->setVertical('center');
-                $this->excel->getActiveSheet()->getStyle('E2:E' . $row)->getAlignment()->setWrapText(true);
-                $filename = 'sales_report';
+                $this->excel->getActiveSheet()->getColumnDimension('I')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('J')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('K')->setWidth(15);
+                $this->excel->getActiveSheet()->getColumnDimension('L')->setWidth(20);
+                $this->excel->getActiveSheet()->getColumnDimension('M')->setWidth(15);
+            
+                $filename = 'payments_report';
                 $this->load->helper('excel');
                 create_excel($this->excel, $filename);
             }
+            
             $this->session->set_flashdata('error', lang('nothing_found'));
             redirect($_SERVER['HTTP_REFERER']);
         } else {
-            $si = "( SELECT sale_id, product_id, serial_no, GROUP_CONCAT(CONCAT({$this->db->dbprefix('sale_items')}.product_name, '__', {$this->db->dbprefix('sale_items')}.quantity) SEPARATOR '___') as item_nane from {$this->db->dbprefix('sale_items')} ";
-            if ($product || $serial) {
-                $si .= ' WHERE ';
-            }
-            if ($product) {
-                $si .= " {$this->db->dbprefix('sale_items')}.product_id = {$product} ";
-            }
-            if ($product && $serial) {
-                $si .= ' AND ';
-            }
-            if ($serial) {
-                $si .= " {$this->db->dbprefix('sale_items')}.serial_no LIKe '%{$serial}%' ";
-            }
-            $si .= " GROUP BY {$this->db->dbprefix('sale_items')}.sale_id ) FSI";
             $this->load->library('datatables');
             $this->datatables
-                ->select("DATE_FORMAT(date, '%Y-%m-%d %T') as date, sales.id as reference_no, biller, customer, FSI.item_nane as iname, grand_total, paid, (grand_total-paid) as balance, payment_status, DATE_FORMAT(due_date, '%Y-%m-%d %T') as due_date, {$this->db->dbprefix('sales')}.id as id", false)
-                ->from('sales')
-                ->join($si, 'FSI.sale_id=sales.id', 'left')
-                ->join('warehouses', 'warehouses.id=sales.warehouse_id', 'left');
-            // ->group_by('sales.id');
+                ->select("DATE_FORMAT({$this->db->dbprefix('payments')}.date, '%Y-%m-%d %T') as date, 
+                DATE_FORMAT({$this->db->dbprefix('sales')}.date, '%Y-%m-%d %T') as date_sale,
+                " . $this->db->dbprefix('payments') . '.id as payment_ref, 
+                ' . $this->db->dbprefix('sales') . '.id as sale_ref, 
+                ' . $this->db->dbprefix('companies') . '.name as customer, 
+                ' . $this->db->dbprefix('users') . ".username as created_by, 
+                CASE 
+                    WHEN {$this->db->dbprefix('sales')}.payment_term > 0 THEN 'Crédito' 
+                    ELSE 'Contado' 
+                END AS payment_type, 
+                sma_sales.payment_term as dias_credito,
+                sma_sales.total as total_factura,
+                amount as abono, 
+                (sma_sales.total - sma_sales.paid) as saldo, 
+                DATE_FORMAT(CURDATE(), '%Y-%m-%d %T') as dia_hoy,
+                CASE 
+                    WHEN sma_sales.due_date IS NOT NULL THEN DATEDIFF(CURDATE(), sma_sales.due_date) 
+                    ELSE 0 
+                END AS atraso,
+                {$this->db->dbprefix('payments')}.id as id")
+                ->from('payments')
+                ->join('sales', 'payments.sale_id=sales.id', 'left')
+                ->join('users', 'payments.created_by=users.id', 'left')
+                ->join('companies', 'companies.id=sales.customer_id', 'left')
+                ->group_by('payments.id');
 
             if ($user) {
-                $this->datatables->where('sales.created_by', $user);
+                $this->datatables->where('payments.created_by', $user);
             }
-            if ($product) {
-                $this->datatables->where('FSI.product_id', $product);
+            if ($card) {
+                $this->datatables->like('payments.cc_no', $card, 'both');
             }
-            if ($serial) {
-                $this->datatables->like('FSI.serial_no', $serial);
+            if ($cheque) {
+                $this->datatables->where('payments.cheque_no', $cheque);
+            }
+            if ($transaction_id) {
+                $this->datatables->where('payments.transaction_id', $transaction_id);
+            }
+            if ($customer) {
+                $this->datatables->where('sales.customer_id', $customer);
+            }
+            if ($supplier) {
+                $this->datatables->where('purchases.supplier_id', $supplier);
             }
             if ($biller) {
                 $this->datatables->where('sales.biller_id', $biller);
@@ -3832,17 +3888,28 @@ class Reports extends MY_Controller
             if ($customer) {
                 $this->datatables->where('sales.customer_id', $customer);
             }
-            if ($warehouse) {
-                $this->datatables->where('sales.warehouse_id', $warehouse);
+            if ($payment_ref) {
+                $this->datatables->like('payments.reference_no', $payment_ref, 'both');
             }
-            if ($reference_no) {
-                $this->datatables->like('sales.reference_no', $reference_no, 'both');
+            if ($paid_by) {
+                $this->datatables->where('payments.paid_by', $paid_by);
+            }
+            if ($sale_ref) {
+                $this->datatables->like('sales.reference_no', $sale_ref, 'both');
+            }
+            if ($purchase_ref) {
+                $this->datatables->like('purchases.reference_no', $purchase_ref, 'both');
             }
             if ($start_date) {
-                $this->datatables->where($this->db->dbprefix('sales') . '.date BETWEEN "' . $start_date . '" and "' . $end_date . '"');
-            }
-            if ($due_date) {
-                $this->datatables->where($this->db->dbprefix('sales') . '.due_date = "' . $due_date . '"');
+                $this->datatables->where($this->db->dbprefix('payments') . '.date BETWEEN "' . $start_date . '" and "' . $end_date . '"');
+            }else{
+                // Calculamos las fechas
+                $fecha_actual = new DateTime(); // Fecha actual
+                $fecha_inicio = $fecha_actual->modify('-7 days')->format('Y-m-d') . ' 00:00:00'; // 30 días atrás, a las 00:00
+                $fecha_fin = (new DateTime())->format('Y-m-d') . ' 23:59:59'; // Hoy, a las 23:59
+
+                // Aplicamos la condición
+                $this->datatables->where($this->db->dbprefix('sales') . '.date BETWEEN "' . $fecha_inicio . '" AND "' . $fecha_fin . '"');
             }
 
             echo $this->datatables->generate();
@@ -3851,13 +3918,13 @@ class Reports extends MY_Controller
 
     public function sales_cartera()
     {
-        $this->sma->checkPermissions('sales');
-        $this->data['error']      = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
-        $this->data['users']      = $this->reports_model->getStaff();
-        $this->data['warehouses'] = $this->site->getAllWarehouses();
-        $this->data['billers']    = $this->site->getAllCompanies('biller');
-        $bc                       = [['link' => base_url(), 'page' => lang('home')], ['link' => admin_url('reports'), 'page' => lang('reports')], ['link' => '#', 'page' => lang('sales_report')]];
-        $meta                     = ['page_title' => lang('Reporte_Cartera'), 'bc' => $bc];
+        $this->sma->checkPermissions('payments');
+        $this->data['error']        = (validation_errors()) ? validation_errors() : $this->session->flashdata('error');
+        $this->data['users']        = $this->reports_model->getStaff();
+        $this->data['billers']      = $this->site->getAllCompanies('biller');
+        $this->data['pos_settings'] = POS ? $this->reports_model->getPOSSetting('biller') : false;
+        $bc                         = [['link' => base_url(), 'page' => lang('home')], ['link' => admin_url('reports'), 'page' => lang('reports')], ['link' => '#', 'page' => lang('payments_report')]];
+        $meta                       = ['page_title' => lang('Reporte Cartera'), 'bc' => $bc];
         $this->page_construct('reports/sales_cartera', $meta, $this->data);
     }
 
